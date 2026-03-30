@@ -51,12 +51,20 @@ class LedgerController extends AppController
         }
         $userId = toInt($userId);
         
-        $page = $this->request->getQuery('page', 1);
-        $limit = $this->request->getQuery('limit', 50);
+        $page      = $this->request->getQuery('page', 1);
+        $limit     = $this->request->getQuery('limit', 50);
+        $unit      = $this->request->getQuery('unit', null);
+        $direction = $this->request->getQuery('direction', null);
+        $from      = $this->request->getQuery('from', null);
+        $to        = $this->request->getQuery('to', null);
 
         $rows = $this->ledgerService->getMovements($userId, [
-            'page' => $page,
-            'limit' => $limit,
+            'page'      => $page,
+            'limit'     => $limit,
+            'unit'      => $unit,
+            'direction' => $direction,
+            'from'      => $from,
+            'to'        => $to,
         ]);
 
         $this->set([

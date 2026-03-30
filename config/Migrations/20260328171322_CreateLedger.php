@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+use Authentication\PasswordHasher\LegacyPasswordHasher;
+use Cake\Log\LogEngineRegistry;
 use Migrations\BaseMigration;
 use Ledger\Model\Table\LedgerEntriesTable;
 
@@ -50,6 +52,7 @@ class CreateLedger extends BaseMigration
                     LedgerEntriesTable::REASON_PAYMENT,
                     LedgerEntriesTable::REASON_TALENT_TRANSFER,
                     LedgerEntriesTable::REASON_ADJUSTMENT,
+                    LedgerEntriesTable::REASON_PAYMENT_DUE
                 ],
                 'null' => false,
             ])
@@ -73,6 +76,11 @@ class CreateLedger extends BaseMigration
             ->addColumn('created_at', 'datetime', [
                 'null' => false,
                 'default' => 'CURRENT_TIMESTAMP',
+            ])
+            ->addColumn('description', 'string', [
+                'limit' => 255,
+                'null' => true,
+                'default' => null,
             ])
             ->addIndex(['user_id'])
             ->addIndex(['counterparty_user_id'])
