@@ -16,6 +16,7 @@ class LedgerEntriesTable extends Table
     // Reason
     public const REASON_TRIP_CONSUMED        = 'TRIP_CONSUMED';
     public const REASON_CARD_PURCHASED       = 'CARD_PURCHASED';
+    public const REASON_CARD_EXPIRE          = 'CARD_EXPIRE';
     public const REASON_WALLET_RECHARGE      = 'WALLET_RECHARGE';
     public const REASON_PAYMENT              = 'PAYMENT';
     public const REASON_TALENT_TRANSFER      = 'TALENT_TRANSFER';
