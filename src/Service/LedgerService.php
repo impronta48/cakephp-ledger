@@ -38,7 +38,11 @@ class LedgerService
             foreach ($entries as $entryData) {
                 $entryData['transfer_id'] = $transferId;
                 $entry = $this->Ledger->newEntity($entryData);
-                $this->Ledger->saveOrFail($entry);
+                try {
+                    $this->Ledger->saveOrFail($entry);
+                } catch (\Exception $e) {
+                    throw new \RuntimeException("Failed to save ledger entry: " . $e->getMessage(), 0, $e);
+                }                
             }
         });
 
@@ -75,18 +79,20 @@ class LedgerService
     }
 
     /**
-     * Saldi wallet (liberi + vincolati separati)
+     * Saldi wallet:
+     *   free_talents  – talenti liberi nel conto utente
+     *   eur_balance   – saldo EUR netto del conto utente (negativo = debito)
+     *   eur_debt      – debito in euro (valore positivo, 0 se nessun debito)
      */
     public function getWallet(int $userId): array
     {
-        $free = $this->Ledger->getFreeBalance($userId, LedgerEntriesTable::UNIT_TALENT);
-        $card = $this->Ledger->getCardBalance($userId);
+        $free       = $this->Ledger->getFreeBalance($userId, LedgerEntriesTable::UNIT_TALENT);
+        $eurBalance = $this->Ledger->getAccountBalance($userId, LedgerEntriesTable::UNIT_EUR);
 
         return [
-            'free_talents'  => $free,
-            'card_talents'  => $card,
-            'total_talents' => $free + $card,
-            'eur'           => $this->Ledger->getBalance($userId, LedgerEntriesTable::UNIT_EUR),
+            'free_talents' => $free,
+            'eur_balance'  => $eurBalance,
+            'eur_debt'     => $eurBalance < 0 ? round(abs($eurBalance), 2) : 0.0,
         ];
     }
 
@@ -202,7 +208,10 @@ class LedgerService
 
         $query = $this->Ledger
             ->find()
-            ->where(['user_id' => $userId])
+            ->where([
+                'user_id' => $userId,
+                'account_id NOT LIKE' => 'system:%',
+            ])
             ->orderBy(['created_at' => 'DESC', 'id' => 'DESC'])
             ->limit($limit)
             ->page($page);

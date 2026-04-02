@@ -62,7 +62,8 @@ class LedgerEntriesTable extends Table
     }
 
     /**
-     * Saldo totale per utente e unità (free + vincolati)
+     * Saldo totale per utente e unità (somma tutte le righe, incluse le contropartite di sistema).
+     * Usare getAccountBalance() per il saldo del solo conto utente.
      */
     public function getBalance(int $userId, string $unit): float
     {
@@ -77,6 +78,24 @@ class LedgerEntriesTable extends Table
     }
 
     /**
+     * Saldo del conto personale dell'utente (account_id = 'user:<userId>').
+     * Per i Talenti, corrisponde ai talenti liberi (non vincolati a card).
+     * Per gli EUR, può essere negativo (debito) o positivo (credito).
+     */
+    public function getAccountBalance(int $userId, string $unit): float
+    {
+        return (float)$this->find()
+            ->where([
+                'user_id'    => $userId,
+                'unit'       => $unit,
+                'account_id' => 'user:' . $userId,
+            ])
+            ->select(['total' => 'SUM(amount)'])
+            ->first()
+            ?->get('total') ?? 0.0;
+    }
+
+    /**
      * Saldo talenti LIBERI (solo righe senza reference_type).
      */
     public function getFreeBalance(int $userId, string $unit = self::UNIT_TALENT): float
@@ -84,8 +103,8 @@ class LedgerEntriesTable extends Table
         return (float)$this->find()
             ->where([
                 'user_id'          => $userId,
-                'unit'             => $unit,
-                'reference_type IS' => null,
+                'unit'             => $unit,    
+                'account_id LIKE'  => 'user:%', // Solo righe relative agli utenti            
             ])
             ->select(['total' => 'SUM(amount)'])
             ->first()
