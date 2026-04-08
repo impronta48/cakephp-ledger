@@ -35,7 +35,7 @@ class LedgerEntriesTable extends Table
         $this->setDisplayField('id');
 
         $this->addBehavior('Timestamp', [
-            'events' => ['Model.beforeSave' => ['created_at' => 'new']]
+            'events' => ['Model.beforeSave' => ['created' => 'new']]
         ]);
 
         $this->belongsTo('Users', [
@@ -123,7 +123,7 @@ class LedgerEntriesTable extends Table
                 'reference_type' => self::REF_CARD,
                 'reference_id'   => $cardId,
             ])
-            ->orderBy(['created_at' => 'DESC', 'id' => 'DESC']);
+            ->orderBy(['created' => 'DESC', 'id' => 'DESC']);
     }
 
     /**
@@ -155,6 +155,36 @@ class LedgerEntriesTable extends Table
     {
         return $this->find()
             ->where(['transfer_id' => $transferId])
-            ->orderBy(['created_at' => 'ASC']);
+            ->orderBy(['created' => 'ASC']);
+    }
+
+    /**
+     * Restituisce tutti gli user_id con saldo EUR negativo,
+     * insieme al relativo saldo aggregato.
+     *
+     * @param int|null $userId  Filtra su un singolo utente (opzionale).
+     * @return array  Array di oggetti con campi user_id e eur_balance.
+     */
+    public function getNegativeUsersEurBalance(?int $userId = null): array
+    {
+        $conditions = [
+            'unit'             => self::UNIT_EUR,
+            'account_id LIKE'  => 'user:%',
+        ];
+
+        if ($userId !== null) {
+            $conditions['user_id'] = $userId;
+        }
+
+        return $this->find()
+            ->where($conditions)
+            ->select([
+                'user_id',
+                'eur_balance' => 'SUM(amount)',
+            ])
+            ->group('user_id')
+            ->having(['SUM(amount) <' => 0])
+            ->all()
+            ->toArray();
     }
 }

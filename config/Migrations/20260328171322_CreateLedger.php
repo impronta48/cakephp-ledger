@@ -73,7 +73,7 @@ class CreateLedger extends BaseMigration
                 'null' => true,
                 'default' => null,
             ])
-            ->addColumn('created_at', 'datetime', [
+            ->addColumn('created', 'datetime', [
                 'null' => false,
                 'default' => 'CURRENT_TIMESTAMP',
             ])

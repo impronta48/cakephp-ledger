@@ -191,8 +191,8 @@ class LedgerService
      *   unit       string|null  filtra per unità ('TALENT' | 'EUR')
      *   reason     string|null  filtra per reason
      *   direction  string|null  filtra per direction: 'IN' (amount >= 0) o 'OUT' (amount < 0)
-     *   from       string|null  data minima created_at (Y-m-d)
-     *   to         string|null  data massima created_at (Y-m-d)
+     *   from       string|null  data minima created (Y-m-d)
+     *   to         string|null  data massima created (Y-m-d)
      *   limit      int          default 50
      *   page       int          default 1
      */
@@ -212,7 +212,7 @@ class LedgerService
                 'user_id' => $userId,
                 'account_id NOT LIKE' => 'system:%',
             ])
-            ->orderBy(['created_at' => 'DESC', 'id' => 'DESC'])
+            ->orderBy(['created' => 'DESC', 'id' => 'DESC'])
             ->limit($limit)
             ->page($page);
 
@@ -228,10 +228,10 @@ class LedgerService
             $query->where(['amount <' => 0]);
         }
         if ($from !== null) {
-            $query->where(['created_at >=' => $from . ' 00:00:00']);
+            $query->where(['created >=' => $from . ' 00:00:00']);
         }
         if ($to !== null) {
-            $query->where(['created_at <=' => $to . ' 23:59:59']);
+            $query->where(['created <=' => $to . ' 23:59:59']);
         }
 
         $entries = $query->all()->toList();
@@ -247,5 +247,54 @@ class LedgerService
             'limit' => $limit,
             'pages' => $limit > 0 ? (int)ceil($total / $limit) : 1,
         ];
+    }
+
+    /**
+     * Restituisce tutti gli utenti con saldo EUR negativo (debitori),
+     * arricchiti con i dati anagrafici dell'utente.
+     *
+     * @param int|null $userId  Filtra su un singolo utente (opzionale, per admin).
+     * @return array
+     */
+    public function getNegativeWallets(?int $userId = null): array
+    {
+        $rows = $this->Ledger->getNegativeUsersEurBalance($userId);
+
+        if (empty($rows)) {
+            return [];
+        }
+
+        $userIds = array_column($rows, 'user_id');
+
+        $Users = TableRegistry::getTableLocator()->get('Users');
+        $users = $Users->find()
+            ->where(['Users.id IN' => $userIds])
+            ->contain(['Persone'])
+            ->all()
+            ->indexBy('id')
+            ->toArray();
+
+        $result = [];
+        foreach ($rows as $row) {
+            $uid        = (int)$row->user_id;
+            $eurBalance = (float)$row->eur_balance;
+            $user       = $users[$uid] ?? null;
+            $persona    = $user?->persona ?? null;
+
+            $result[] = [
+                'user_id'     => $uid,
+                'user'        => $persona ? [
+                    'id'        => $uid,
+                    'Nome'      => $persona->Nome      ?? null,
+                    'Cognome'   => $persona->Cognome   ?? null,
+                    'EMail'     => $persona->EMail     ?? null,
+                    'Cellulare' => $persona->Cellulare ?? null,
+                ] : null,
+                'eur_balance' => $eurBalance,
+                'eur_debt'    => round(abs($eurBalance), 2),
+            ];
+        }
+
+        return $result;
     }
 }

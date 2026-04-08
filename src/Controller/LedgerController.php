@@ -6,6 +6,7 @@ namespace Ledger\Controller;
 
 use Ledger\Controller\AppController;
 use Ledger\Service\LedgerService;
+use Ledger\Model\Table\LedgerEntriesTable;
 
 use function Cake\Core\toInt;
 
@@ -91,6 +92,107 @@ class LedgerController extends AppController
             'wallet' => $wallet
         ]);
         $this->viewBuilder()->setOption('serialize', ['success', 'wallet']);
+    }
+
+    /**
+     * Restituisce tutti gli utenti con saldo EUR negativo (debitori).
+     * Solo gli admin possono accedere.
+     *
+     * Query params:
+     *   user_id (int, optional) – filtra su un singolo utente
+     */
+    public function negativeWallets()
+    {
+        if ($this->Authentication->getIdentity()->get('group_id') != 1) {
+            $this->response = $this->response->withStatus(403);
+            $this->set(['success' => false, 'message' => 'Forbidden']);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+            return;
+        }
+
+        $userId = $this->request->getQuery('user_id', null);
+        if ($userId !== null) {
+            $userId = toInt($userId);
+        }
+
+        $data = $this->ledgerService->getNegativeWallets($userId);
+
+        $this->set([
+            'success' => true,
+            'data'    => $data,
+        ]);
+        $this->viewBuilder()->setOption('serialize', ['success', 'data']);
+    }
+
+    /**
+     * Create a double-entry talent transfer between two users (admin only).
+     *
+     * POST /ledger/ledger/transfer.json
+     * Body JSON:
+     *   from_user_id  int     – sender user ID
+     *   to_user_id    int     – recipient user ID
+     *   amount        float   – positive amount to transfer
+     *   unit          string  – 'TALENT' (default) or 'EUR'
+     *   reason        string  – optional, defaults to 'TALENT_TRANSFER'
+     *   description   string  – optional description stored in metadata
+     */
+    public function transfer()
+    {
+        $this->request->allowMethod(['post']);
+
+        if ($this->Authentication->getIdentity()->get('group_id') != 1) {
+            $this->response = $this->response->withStatus(403);
+            $this->set(['success' => false, 'message' => 'Forbidden']);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+            return;
+        }
+
+        $data        = $this->request->getData();
+        $fromUserId  = toInt($data['from_user_id'] ?? 0);
+        $toUserId    = toInt($data['to_user_id'] ?? 0);
+        $amount      = (float)($data['amount'] ?? 0);
+        $unit        = $data['unit'] ?? LedgerEntriesTable::UNIT_TALENT;
+        $reason      = $data['reason'] ?? LedgerEntriesTable::REASON_TALENT_TRANSFER;
+        $description = $data['description'] ?? '';
+
+        if ($fromUserId <= 0 || $toUserId <= 0 || $amount <= 0) {
+            $this->response = $this->response->withStatus(400);
+            $this->set(['success' => false, 'message' => 'from_user_id, to_user_id and amount are required and must be positive']);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+            return;
+        }
+
+        $meta = [];
+        if (!empty($description)) {
+            $meta['description'] = $description;
+        }
+
+        try {
+            $transferId = $this->ledgerService->addTransfer([
+                [
+                    'user_id'              => $fromUserId,
+                    'counterparty_user_id' => $toUserId,
+                    'unit'                 => $unit,
+                    'amount'               => -abs($amount),
+                    'reason'               => $reason,
+                    'metadata'             => $meta,
+                ],
+                [
+                    'user_id'              => $toUserId,
+                    'counterparty_user_id' => $fromUserId,
+                    'unit'                 => $unit,
+                    'amount'               => abs($amount),
+                    'reason'               => $reason,
+                    'metadata'             => $meta,
+                ],
+            ]);
+
+            $this->set(['success' => true, 'transfer_id' => $transferId]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'transfer_id']);
+        } catch (\Exception $e) {
+            $this->set(['success' => false, 'message' => $e->getMessage()]);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+        }
     }
 
 }
