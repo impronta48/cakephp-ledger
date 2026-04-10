@@ -15,7 +15,7 @@ class AlterLegderEntries extends BaseMigration
      */
     public function change(): void
     {
-        $table = $this->table('legder_entries');
+        $table = $this->table('ledger_entries');
         $table->renameColumn('created_at', 'created');
         $table->update();
     }
