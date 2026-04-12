@@ -22,6 +22,8 @@ class LedgerEntriesTable extends Table
     public const REASON_PAYMENT              = 'PAYMENT';
     public const REASON_TALENT_TRANSFER      = 'TALENT_TRANSFER';
     public const REASON_ADJUSTMENT           = 'ADJUSTMENT';
+    public const REASON_REFUND               = 'REFUND';
+    public const REASON_WELCOME_BONUS        = 'WELCOME_BONUS';
 
     // Reference type
     public const REF_CARD = 'Card';

@@ -55,8 +55,10 @@ class LedgerService
     public function transferTalents(
         int $fromUser,
         int $toUser,
-        float $amount,
-        array $meta = []
+        float $amount,        
+        array $meta = [],
+        ?\DateTimeInterface $date = null,
+        string $description = ''
     ): string {
         return $this->addTransfer([
             [
@@ -66,6 +68,8 @@ class LedgerService
                 'amount'               => -abs($amount),
                 'reason'               => LedgerEntriesTable::REASON_TALENT_TRANSFER,
                 'metadata'             => $meta,
+                'created'              => $date,
+                'description'          => $description,
             ],
             [
                 'user_id'              => $toUser,
@@ -74,6 +78,8 @@ class LedgerService
                 'amount'               => abs($amount),
                 'reason'               => LedgerEntriesTable::REASON_TALENT_TRANSFER,
                 'metadata'             => $meta,
+                'created'              => $date,
+                'description'          => $description,
             ],
         ]);
     }
@@ -107,7 +113,9 @@ class LedgerService
         int $userId,
         int $cardId,
         float $amount,
-        array $meta = []
+        array $meta = [],
+        ?\DateTimeInterface $date = null,
+        string $description = ''
     ): string {
         return $this->addTransfer([
             [
@@ -118,6 +126,8 @@ class LedgerService
                 'reference_type' => null,
                 'reference_id'   => null,
                 'metadata'       => $meta,
+                'created'        => $date,
+                'description'    => $description,
             ],
             [
                 'user_id'        => $userId,
@@ -127,13 +137,12 @@ class LedgerService
                 'reference_type' => LedgerEntriesTable::REF_CARD,
                 'reference_id'   => $cardId,
                 'metadata'       => $meta,
+                'created'        => $date,
+                'description'    => $description,
             ],
         ]);
     }
 
-    /**
-     * Consuma talenti dal conto card (viaggio effettuato).
-     */
     /**
      * Consuma talenti dal conto card (viaggio effettuato).
      * $amount deve essere il costo del viaggio (sempre positivo).
@@ -142,7 +151,9 @@ class LedgerService
         int $userId,
         int $cardId,
         float $amount,
-        array $meta = []
+        array $meta = [],
+            ?\DateTimeInterface $date = null,
+            string $description = ''
     ) {
         return $this->addEntry([
             'user_id'        => $userId,
@@ -152,6 +163,8 @@ class LedgerService
             'reference_type' => LedgerEntriesTable::REF_CARD,
             'reference_id'   => $cardId,
             'metadata'       => $meta,
+            'created'        => $date,
+            'description'    => $description,
         ]);
     }
 
@@ -165,7 +178,9 @@ class LedgerService
     public function expireCard(
         int $userId,
         int $cardId,
-        array $meta = []
+        array $meta = [],
+        ?\DateTimeInterface $date = null,
+        string $description = ''
     ) {
         $residuo = $this->Ledger->getCardBalance($userId, $cardId);
 
@@ -181,6 +196,9 @@ class LedgerService
             'reference_type' => LedgerEntriesTable::REF_CARD,
             'reference_id'   => $cardId,
             'metadata'       => array_merge(['expired' => true], $meta),
+            'created'        => $date,
+            'description'    => $description,
+
         ]);
     }
 
