@@ -203,6 +203,21 @@ class LedgerService
     }
 
     /**
+     * Elimina una singola riga del ledger per ID.
+     *
+     * @param int $id – ID della riga da eliminare
+     * @return bool   – true se eliminata, false se non trovata
+     */
+    public function deleteEntry(int $id): bool
+    {
+        $entry = $this->Ledger->find()->where(['id' => $id])->first();
+        if (!$entry) {
+            return false;
+        }
+        return (bool)$this->Ledger->delete($entry);
+    }
+
+    /**
      * Movimenti di un utente, ordinati dal più recente.
      *
      * Opzioni supportate:

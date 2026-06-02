@@ -178,7 +178,7 @@ class LedgerController extends AppController
                         'reason'          => LedgerEntriesTable::REASON_TALENT_TRANSFER,
                         'reference_type'  => null,
                         'reference_id'    => null,
-                        'description'     => sprintf('Trasferimento %s',$description),
+                        'description'     => sprintf('Delega Uso %s',$description),
                         'metadata'        => ['origin' => 'wallet_transfer'],
                         'idempotency_key' => "user:{$userId}:wallet:{$userId}:to:{$toUserId}:date:{$tsKey}",
                     ],
@@ -193,7 +193,7 @@ class LedgerController extends AppController
                         'reason'          => LedgerEntriesTable::REASON_TALENT_TRANSFER,
                         'reference_type'  => null,
                         'reference_id'    => null,
-                        'description'     => sprintf('Trasferimento %s',$description),
+                        'description'     => sprintf('Delega Uso %s',$description),
                         'metadata'        => ['origin' => 'wallet_transfer'],
                         'idempotency_key' => "user:{$toUserId}:wallet:{$toUserId}:from:{$userId}:date:{$tsKey}",
                     ],
@@ -286,6 +286,42 @@ class LedgerController extends AppController
             $this->set(['success' => false, 'message' => $e->getMessage()]);
             $this->viewBuilder()->setOption('serialize', ['success', 'message']);
         }
+    }
+
+    /**
+     * Delete a single ledger entry by ID (admin only).
+     *
+     * DELETE /ledger/ledger/delete/{id}.json
+     */
+    public function delete($id = null)
+    {
+        $this->request->allowMethod(['delete', 'post']);
+
+        if ($this->Authentication->getIdentity()->get('group_id') != 1) {
+            $this->response = $this->response->withStatus(403);
+            $this->set(['success' => false, 'message' => 'Forbidden']);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+            return;
+        }
+
+        if (!$id) {
+            $this->response = $this->response->withStatus(400);
+            $this->set(['success' => false, 'message' => 'ID obbligatorio']);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+            return;
+        }
+
+        $deleted = $this->ledgerService->deleteEntry((int)$id);
+
+        if (!$deleted) {
+            $this->response = $this->response->withStatus(404);
+            $this->set(['success' => false, 'message' => 'Voce non trovata']);
+            $this->viewBuilder()->setOption('serialize', ['success', 'message']);
+            return;
+        }
+
+        $this->set(['success' => true]);
+        $this->viewBuilder()->setOption('serialize', ['success']);
     }
 
 }
