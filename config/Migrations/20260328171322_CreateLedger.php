@@ -1,10 +1,7 @@
 <?php
 declare(strict_types=1);
 
-use Authentication\PasswordHasher\LegacyPasswordHasher;
-use Cake\Log\LogEngineRegistry;
 use Migrations\BaseMigration;
-use Ledger\Model\Table\LedgerEntriesTable;
 
 class CreateLedger extends BaseMigration
 {
@@ -29,7 +26,7 @@ class CreateLedger extends BaseMigration
                 'default' => null,
             ])
             ->addColumn('unit', 'enum', [
-                'values' => [LedgerEntriesTable::UNIT_TALENT, LedgerEntriesTable::UNIT_EUR],
+                'values' => ['TALENT', 'EUR'],
                 'null' => false,
             ])
             ->addColumn('amount', 'decimal', [
@@ -46,13 +43,13 @@ class CreateLedger extends BaseMigration
             ])
             ->addColumn('reason', 'enum', [
                 'values' => [
-                    LedgerEntriesTable::REASON_TRIP_CONSUMED,
-                    LedgerEntriesTable::REASON_CARD_PURCHASED,
-                    LedgerEntriesTable::REASON_WALLET_RECHARGE,
-                    LedgerEntriesTable::REASON_PAYMENT,
-                    LedgerEntriesTable::REASON_TALENT_TRANSFER,
-                    LedgerEntriesTable::REASON_ADJUSTMENT,
-                    LedgerEntriesTable::REASON_PAYMENT_DUE
+                    'TRIP_CONSUMED',
+                    'CARD_PURCHASED',
+                    'WALLET_RECHARGE',
+                    'PAYMENT',
+                    'TALENT_TRANSFER',
+                    'ADJUSTMENT',
+                    'PAYMENT_DUE',
                 ],
                 'null' => false,
             ])

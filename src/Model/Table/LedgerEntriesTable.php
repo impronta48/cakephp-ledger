@@ -5,30 +5,46 @@ namespace Ledger\Model\Table;
 
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
-use Cake\ORM\RulesChecker;
 
 class LedgerEntriesTable extends Table
 {
-    // Unità di misura
-    public const UNIT_TALENT = 'TALENT';
+    // ── Units ──────────────────────────────────────────────────────────────
     public const UNIT_EUR    = 'EUR';
+    public const UNIT_TALENT = 'TALENT'; // Riservato per futuri premi/punti
 
-    // Reason
-    public const REASON_TRIP_CONSUMED        = 'TRIP_CONSUMED';
-    public const REASON_CARD_PURCHASED       = 'CARD_PURCHASED';
-    public const REASON_CARD_EXPIRE          = 'CARD_EXPIRE';
-    public const REASON_WALLET_RECHARGE      = 'WALLET_RECHARGE';
-    public const REASON_PAYMENT_DUE          = 'PAYMENT_DUE';
-    public const REASON_PAYMENT              = 'PAYMENT';
-    public const REASON_TALENT_TRANSFER      = 'TALENT_TRANSFER';
-    public const REASON_ADJUSTMENT           = 'ADJUSTMENT';
-    public const REASON_REFUND               = 'REFUND';
-    public const REASON_WELCOME_BONUS        = 'WELCOME_BONUS';
-    public const REASON_CARD                 = 'CARD';
-    public const REASON_RIMBORSO_KM          = 'RIMBORSO_KM';
+    // ── Reasons (EUR) ──────────────────────────────────────────────────────
 
-    // Reference type
-    public const REF_CARD = 'Card';
+    /** Addebito acquisto abbonamento */
+    public const REASON_CARD_CHARGE = 'CARD_CHARGE';
+
+    /** Pagamento incassato */
+    public const REASON_PAYMENT = 'PAYMENT';
+
+    /** Rimborso km previsionale (accredito a inizio mese) */
+    public const REASON_KM_REFUND = 'KM_REFUND';
+
+    /** Storno rimborso km per viaggi non effettuati */
+    public const REASON_KM_REFUND_REVERSAL = 'KM_REFUND_REVERSAL';
+
+    /** Sponsor copre il costo dell'utente sponsorizzato */
+    public const REASON_SPONSOR_COVERAGE = 'SPONSOR_COVERAGE';
+
+    /** Rettifica manuale */
+    public const REASON_ADJUSTMENT = 'ADJUSTMENT';
+
+    /** Rimborso */
+    public const REASON_REFUND = 'REFUND';
+
+    // ── Reference types ────────────────────────────────────────────────────
+    public const REF_CARD    = 'Card';
+    public const REF_PAYIN   = 'Payin';
+    public const REF_REQUEST = 'Request';
+
+    // ── Account ID convention ──────────────────────────────────────────────
+    // user:{id}             Conto EUR dell'utente (negativo = debito)
+    // sponsor:{id}          Budget EUR dello sponsor (persona_id)
+    // system:receivables    Crediti EUR da incassare
+    // system:km_pool        Pool rimborsi km
 
     public function initialize(array $config): void
     {
@@ -39,15 +55,12 @@ class LedgerEntriesTable extends Table
         $this->setDisplayField('id');
 
         $this->addBehavior('Timestamp', [
-            'events' => ['Model.beforeSave' => ['created' => 'new']]
+            'events' => ['Model.beforeSave' => ['created' => 'new']],
         ]);
 
-        $this->belongsTo('Users', [
-            'foreignKey' => 'user_id',
-        ]);
-
+        $this->belongsTo('Users', ['foreignKey' => 'user_id']);
         $this->belongsTo('CounterpartyUsers', [
-            'className' => 'Users',
+            'className'  => 'Users',
             'foreignKey' => 'counterparty_user_id',
         ]);
     }
@@ -56,7 +69,7 @@ class LedgerEntriesTable extends Table
     {
         return $validator
             ->integer('user_id')->requirePresence('user_id')
-            ->scalar('unit')->inList('unit', [self::UNIT_TALENT, self::UNIT_EUR])
+            ->scalar('unit')->inList('unit', [self::UNIT_EUR, self::UNIT_TALENT])
             ->numeric('amount')->notEmptyString('amount')
             ->scalar('reason')->notEmptyString('reason')
             ->allowEmptyString('transfer_id')
@@ -65,33 +78,18 @@ class LedgerEntriesTable extends Table
             ->allowEmptyArray('metadata');
     }
 
-    /**
-     * Saldo totale per utente e unità (somma tutte le righe, incluse le contropartite di sistema).
-     * Usare getAccountBalance() per il saldo del solo conto utente.
-     */
-    public function getBalance(int $userId, string $unit): float
-    {
-        return (float)$this->find()
-            ->where([
-                'user_id' => $userId,
-                'unit' => $unit,
-            ])
-            ->select(['total' => 'SUM(amount)'])
-            ->first()
-            ?->get('total') ?? 0.0;
-    }
+    // ── Balance queries ────────────────────────────────────────────────────
 
     /**
-     * Saldo del conto personale dell'utente (account_id = 'user:<userId>').
-     * Per i Talenti, corrisponde ai talenti liberi (non vincolati a card).
-     * Per gli EUR, può essere negativo (debito) o positivo (credito).
+     * Saldo EUR del conto personale di un utente (account_id = 'user:{userId}').
+     * Negativo = debito verso la piattaforma.
      */
-    public function getAccountBalance(int $userId, string $unit): float
+    public function getAccountBalance(int $userId): float
     {
         return (float)$this->find()
             ->where([
                 'user_id'    => $userId,
-                'unit'       => $unit,
+                'unit'       => self::UNIT_EUR,
                 'account_id' => 'user:' . $userId,
             ])
             ->select(['total' => 'SUM(amount)'])
@@ -100,15 +98,15 @@ class LedgerEntriesTable extends Table
     }
 
     /**
-     * Saldo talenti LIBERI (solo righe senza reference_type).
+     * Budget EUR residuo di uno sponsor.
+     * Positivo = ha ancora budget; negativo = ha sforato.
      */
-    public function getFreeBalance(int $userId, string $unit = self::UNIT_TALENT): float
+    public function getSponsorBudget(int $sponsorPersonaId): float
     {
         return (float)$this->find()
             ->where([
-                'user_id'          => $userId,
-                'unit'             => $unit,    
-                'account_id LIKE'  => 'user:%', // Solo righe relative agli utenti            
+                'account_id' => 'sponsor:' . $sponsorPersonaId,
+                'unit'       => self::UNIT_EUR,
             ])
             ->select(['total' => 'SUM(amount)'])
             ->first()
@@ -116,44 +114,7 @@ class LedgerEntriesTable extends Table
     }
 
     /**
-     * Storico dei movimenti di una card specifica, dal più recente.
-     */
-    public function getCardEntries(int $userId, int $cardId)
-    {
-        return $this->find()
-            ->where([
-                'user_id'        => $userId,
-                'unit'           => self::UNIT_TALENT,
-                'reference_type' => self::REF_CARD,
-                'reference_id'   => $cardId,
-            ])
-            ->orderBy(['created' => 'DESC', 'id' => 'DESC']);
-    }
-
-    /**
-     * Saldo talenti vincolati a una card specifica.
-     * Se $cardId è null restituisce il totale di tutti i conti card dell'utente.
-     */
-    public function getCardBalance(int $userId, ?int $cardId = null): float
-    {
-        $conditions = [
-            'user_id'        => $userId,
-            'unit'           => self::UNIT_TALENT,
-            'reference_type' => self::REF_CARD,
-        ];
-        if ($cardId !== null) {
-            $conditions['reference_id'] = $cardId;
-        }
-
-        return (float)$this->find()
-            ->where($conditions)
-            ->select(['total' => 'SUM(amount)'])
-            ->first()
-            ?->get('total') ?? 0.0;
-    }
-
-    /**
-     * Movimenti per transfer_id (utile per audit)
+     * Movimenti per transfer_id (audit).
      */
     public function getTransferEntries(string $transferId)
     {
@@ -163,31 +124,36 @@ class LedgerEntriesTable extends Table
     }
 
     /**
-     * Restituisce tutti gli user_id con saldo EUR negativo,
-     * insieme al relativo saldo aggregato.
-     *
-     * @param int|null $userId  Filtra su un singolo utente (opzionale).
-     * @return array  Array di oggetti con campi user_id e eur_balance.
+     * Utenti con saldo EUR negativo sul proprio conto (account_id LIKE 'user:%').
      */
     public function getNegativeUsersEurBalance(?int $userId = null): array
     {
-        $conditions = [
-            'unit'             => self::UNIT_EUR,
-            'account_id LIKE'  => 'user:%',
-        ];
-
+        $conditions = ['unit' => self::UNIT_EUR, 'account_id LIKE' => 'user:%'];
         if ($userId !== null) {
             $conditions['user_id'] = $userId;
         }
 
         return $this->find()
             ->where($conditions)
-            ->select([
-                'user_id',
-                'eur_balance' => 'SUM(amount)',
-            ])
-            ->group('user_id')
+            ->select(['user_id', 'eur_balance' => 'SUM(amount)'])
+            ->groupBy('user_id')
             ->having(['SUM(amount) <' => 0])
+            ->enableHydration(false)
+            ->all()
+            ->toArray();
+    }
+
+    /**
+     * Sponsor con budget EUR esaurito (overspent).
+     */
+    public function getOverspentSponsors(): array
+    {
+        return $this->find()
+            ->where(['unit' => self::UNIT_EUR, 'account_id LIKE' => 'sponsor:%'])
+            ->select(['account_id', 'balance' => 'SUM(amount)'])
+            ->groupBy('account_id')
+            ->having(['SUM(amount) <' => 0])
+            ->enableHydration(false)
             ->all()
             ->toArray();
     }
