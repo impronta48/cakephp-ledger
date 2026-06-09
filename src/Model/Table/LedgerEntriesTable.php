@@ -35,6 +35,9 @@ class LedgerEntriesTable extends Table
     /** Rimborso */
     public const REASON_REFUND = 'REFUND';
 
+    /** @deprecated Legacy reason — trattato come CARD_CHARGE nei nuovi flussi */
+    public const REASON_PAYMENT_DUE = 'PAYMENT_DUE';
+
     // ── Reference types ────────────────────────────────────────────────────
     public const REF_CARD    = 'Card';
     public const REF_PAYIN   = 'Payin';
