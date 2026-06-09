@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Ledger\Controller;
 
+use Cake\Core\Configure;
 use Ledger\Controller\AppController;
 use Ledger\Service\LedgerService;
 use Ledger\Model\Table\LedgerEntriesTable;
@@ -46,7 +47,7 @@ class LedgerController extends AppController
     {
         $currentUser = $this->Authentication->getIdentity()->get('id');
         //Se l'utente è admin può vedere i movimenti di chiunque, altrimenti solo i suoi
-        if ($this->Authentication->getIdentity()->get('group_id') == 1){
+        if ($this->Authentication->getIdentity()->get('group_id') == Configure::read('Role.admin')){
             $userId = $user_id ?? $currentUser;
         } else {
             $userId = $currentUser;
@@ -79,7 +80,7 @@ class LedgerController extends AppController
     public function wallet($user_id = null)
     {
         $currentUser = $this->Authentication->getIdentity()->get('id');
-                if ($this->Authentication->getIdentity()->get('group_id') == 1){
+                if ($this->Authentication->getIdentity()->get('group_id') == Configure::read('Role.admin')){
             $userId = $user_id ?? $currentUser;
         } else {
             $userId = $currentUser;
@@ -104,7 +105,7 @@ class LedgerController extends AppController
      */
     public function negativeWallets()
     {
-        if ($this->Authentication->getIdentity()->get('group_id') != 1) {
+        if ($this->Authentication->getIdentity()->get('group_id') != Configure::read('Role.admin')) {
             $this->response = $this->response->withStatus(403);
             $this->set(['success' => false, 'message' => 'Forbidden']);
             $this->viewBuilder()->setOption('serialize', ['success', 'message']);
@@ -141,7 +142,7 @@ class LedgerController extends AppController
     {
         $this->request->allowMethod(['post']);
 
-        if ($this->Authentication->getIdentity()->get('group_id') != 1) {
+        if ($this->Authentication->getIdentity()->get('group_id') != Configure::read('Role.admin')) {
             $this->response = $this->response->withStatus(403);
             $this->set(['success' => false, 'message' => 'Forbidden']);
             $this->viewBuilder()->setOption('serialize', ['success', 'message']);
@@ -225,7 +226,7 @@ class LedgerController extends AppController
     {
         $this->request->allowMethod(['post']);
 
-        if ($this->Authentication->getIdentity()->get('group_id') != 1) {
+        if ($this->Authentication->getIdentity()->get('group_id') != Configure::read('Role.admin')) {
             $this->response = $this->response->withStatus(403);
             $this->set(['success' => false, 'message' => 'Forbidden']);
             $this->viewBuilder()->setOption('serialize', ['success', 'message']);
@@ -297,7 +298,7 @@ class LedgerController extends AppController
     {
         $this->request->allowMethod(['delete', 'post']);
 
-        if ($this->Authentication->getIdentity()->get('group_id') != 1) {
+        if ($this->Authentication->getIdentity()->get('group_id') != Configure::read('Role.admin')) {
             $this->response = $this->response->withStatus(403);
             $this->set(['success' => false, 'message' => 'Forbidden']);
             $this->viewBuilder()->setOption('serialize', ['success', 'message']);
